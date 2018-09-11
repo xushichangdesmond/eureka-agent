@@ -84,6 +84,10 @@ func run(logger *log.Logger, eurekaUrl string, registration agent.Registration, 
 				url = eurekaUrl + "/apps/" + registration.Instance.App
 				logger.Println("Sending registration to ", url)
 				registration.Instance.Status = "UP"
+				registration.Instance.DataCenterInfo = agent.DataCenterInfo{
+					Class: "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",
+					Name:  "MyOwn",
+				}
 				body, err := json.Marshal(registration)
 				if err != nil {
 					logger.Fatalln("Cannot marshal registration request", registration)
