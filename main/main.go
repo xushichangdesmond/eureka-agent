@@ -9,31 +9,62 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/xushichangdesmond/eureka-agent"
 )
 
-var eurekaUrl = flag.String("eurekaUrl", "http://localhost:10001/eureka", "eureka url")
+//var eurekaUrl = flag.String("eurekaUrl", "http://localhost:10001/eureka", "eureka url")
+var configDir = flag.String("configDir", "config", "configDir")
 
 func main() {
-	flag.Usage()
+
 	flag.Parse()
-	registration := &agent.Registration{}
 
-	input, err := ioutil.ReadAll(os.Stdin)
+	logger := log.New(os.Stdout, "eureka-agent", log.LstdFlags)
+
+	pl, err := ioutil.ReadFile(filepath.Join(*configDir, "eurekaUrl"))
 	if err != nil {
-		panic(err)
+		logger.Fatalln("cannot read eurekaUrl", err)
 	}
+	eurekaUrls := strings.Split(string(pl), "\n")
+	logger.Println("using eurekaUrls", eurekaUrls)
 
-	if err := json.Unmarshal(input, registration); err != nil {
-		panic(err)
-	}
+	wg := &sync.WaitGroup{}
+	defer wg.Wait()
 
 	quit := make(chan os.Signal)
 	signal.Notify(quit)
 
-	run(log.New(os.Stdout, "eureka-agent", log.LstdFlags), *eurekaUrl, *registration, quit)
+	filepath.Walk(*configDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			logger.Panicln("Error walking config directory", path, err)
+			return nil
+		}
+		if filepath.Ext(path) == ".registration" {
+			wg.Add(1)
+
+			registration := &agent.Registration{}
+			logger.Println("Processing", path)
+			input, err := ioutil.ReadFile(path)
+			if err != nil {
+				logger.Fatalln(err)
+			}
+			if err := json.Unmarshal(input, registration); err != nil {
+				logger.Fatalln(err)
+			}
+
+			go func() {
+				run(logger, eurekaUrl, *registration, quit)
+				wg.Done()
+			}()
+		}
+		return nil
+	})
+
 }
 
 func run(logger *log.Logger, eurekaUrl string, registration agent.Registration, quit <-chan os.Signal) {
@@ -61,7 +92,7 @@ func run(logger *log.Logger, eurekaUrl string, registration agent.Registration, 
 				url := eurekaUrl + "/apps/" + registration.Instance.App + "/" + registration.Instance.InstanceId
 				req, err := http.NewRequest("DELETE", url, http.NoBody)
 				if err != nil {
-					logger.Fatalln("invalid delete request ", err)
+					logger.Println("invalid delete request ", err)
 				}
 				resp, err := http.DefaultClient.Do(req)
 				logger.Println("Deregister response", resp, ",err", err)
@@ -72,7 +103,7 @@ func run(logger *log.Logger, eurekaUrl string, registration agent.Registration, 
 			logger.Println("Sending heartbeat to ", url)
 			req, err := http.NewRequest("PUT", url, http.NoBody)
 			if err != nil {
-				logger.Fatalln("invalid put request ", err)
+				logger.Println("invalid put request ", err)
 			}
 			resp, err := http.DefaultClient.Do(req)
 
@@ -90,7 +121,7 @@ func run(logger *log.Logger, eurekaUrl string, registration agent.Registration, 
 				}
 				body, err := json.Marshal(registration)
 				if err != nil {
-					logger.Fatalln("Cannot marshal registration request", registration)
+					logger.Println("Cannot marshal registration request", registration)
 				}
 				resp, err = http.Post(url, "application/json", bytes.NewReader(body))
 				if err != nil {

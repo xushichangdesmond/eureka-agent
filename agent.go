@@ -18,6 +18,7 @@ type Instance struct {
 	StatusPageUrl  string         `json:"statusPageUrl"`
 	HomePageUrl    string         `json:"homePageUrl"`
 	DataCenterInfo DataCenterInfo `json:"dataCenterInfo"`
+	LeaseInfo      LeaseInfo      `json:"leaseInfo"`
 }
 
 type Port struct {
@@ -28,4 +29,8 @@ type Port struct {
 type DataCenterInfo struct {
 	Class string `json:"@class"`
 	Name  string `json:"name"`
+}
+
+type LeaseInfo struct {
+	DurationInSecs string `json:"durationInSecs"`
 }
