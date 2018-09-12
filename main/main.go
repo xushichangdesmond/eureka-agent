@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -30,8 +29,8 @@ func main() {
 	if err != nil {
 		logger.Fatalln("cannot read eurekaUrl", err)
 	}
-	eurekaUrls := strings.Split(string(pl), "\n")
-	logger.Println("using eurekaUrls", eurekaUrls)
+	eurekaUrl := string(pl)
+	logger.Println("using eurekaUrl", eurekaUrl)
 
 	wg := &sync.WaitGroup{}
 	defer wg.Wait()
